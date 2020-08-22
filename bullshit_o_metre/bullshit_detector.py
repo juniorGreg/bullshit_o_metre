@@ -15,8 +15,10 @@ import numpy as np
 
 
 class BullshitDetector(BaseEstimator, ClassifierMixin, TransformerMixin):
-    def __init__(self):
-        self.vec = TfidfVectorizer(max_features=1000, ngram_range=(1,2))
+    def __init__(self, max_features=1000, ngram_range=(1,2)):
+        self.max_features = max_features
+        self.ngram_range = ngram_range
+        self.vec = TfidfVectorizer(max_features=self.max_features, ngram_range=self.ngram_range)
         self.clf = MultinomialNB()
         #self.clf = LogisticRegression(C=200)
         self.nlp = spacy.load('fr_core_news_sm')
