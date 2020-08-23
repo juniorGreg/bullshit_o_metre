@@ -9,9 +9,12 @@ from bullshit_o_metre.bullshit_detector import BullshitDetector
 from joblib import dump
 
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import RandomizedSearchCV
 
 import numpy as np
+
+from hyperopt import hp, fmin, tpe
 
 
 if __name__ == "__main__":
@@ -38,32 +41,30 @@ if __name__ == "__main__":
         ngram_ranges = []
         numbers = list(range(1, max_range+1))
         for number_a in numbers:
-            for number_b in numbers[(number_a-1):]:
-                ngram_ranges.append((number_a, number_b))
+            ngram_ranges.append((1, number))
 
         print(ngram_ranges)
         return ngram_ranges
 
 
-    param_grid = {'max_features': list(range(450, 3001)), 'ngram_range': combinations_ngram_range(6)}
+    space = {
+        'max_features': hp.quniform("max_features", 450, 3000, 25),
+        'ngram_range': hp.quniform("ngram_range", 1, 10, 1)
+    }
 
-    random_bsd =RandomizedSearchCV(
-        estimator = BullshitDetector(),
-        param_distributions = param_grid,
-        n_iter = 10,
-        scoring='accuracy',
-        n_jobs=2,
-        cv=5,
-        refit=True,
-        return_train_score=True
-    )
+    def objective(params):
+         bsd = BullshitDetector(max_features=int(params["max_features"]), ngram_range=(1,int(params['ngram_range'])))
+         bsd.fit(X_train, y_train)
 
+         loss = 1 - bsd.score(X_test, y_test)
+         return loss
 
-    random_bsd.fit(X_train, y_train)
+    best = fmin(fn=objective, space=space, max_evals=5, rstate=np.random.RandomState(42), algo=tpe.suggest)
+    print(best)
 
-    print(random_bsd.cv_results_['param_max_features'])
-    print(random_bsd.cv_results_['param_ngram_range'])
+    bsd = BullshitDetector(max_features=int(best["max_features"]), ngram_range=(1,int(best["ngram_range"])))
+    bsd.fit(X_train, y_train)
 
-    print(random_bsd.best_estimator_.score(X_test, y_test))
+    print(bsd.score(X_test, y_test))
 
-    dump(random_bsd.best_estimator_, "bsd.joblib", compress=True)
+    dump(bsd, "bsd.joblib", compress=True)
